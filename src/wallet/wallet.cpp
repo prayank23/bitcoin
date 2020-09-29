@@ -212,6 +212,7 @@ std::shared_ptr<CWallet> LoadWalletInternal(interfaces::Chain& chain, const std:
         std::shared_ptr<CWallet> wallet = CWallet::Create(chain, name, std::move(database), options.create_flags, error, warnings);
         if (!wallet) {
             error = Untranslated("Wallet loading failed.") + Untranslated(" ") + error;
+            status = DatabaseStatus::FAILED_LOAD;
             return nullptr;
         }
         AddWallet(wallet);
@@ -223,6 +224,7 @@ std::shared_ptr<CWallet> LoadWalletInternal(interfaces::Chain& chain, const std:
         return wallet;
     } catch (const std::runtime_error& e) {
         error = Untranslated(e.what());
+        status = DatabaseStatus::FAILED_LOAD;
         return nullptr;
     }
 }
@@ -233,6 +235,7 @@ std::shared_ptr<CWallet> LoadWallet(interfaces::Chain& chain, const std::string&
     auto result = WITH_LOCK(g_loading_wallet_mutex, return g_loading_wallet_set.insert(name));
     if (!result.second) {
         error = Untranslated("Wallet already being loading.");
+        status = DatabaseStatus::FAILED_LOAD;
         return nullptr;
     }
     auto wallet = LoadWalletInternal(chain, name, load_on_start, options, status, error, warnings);
@@ -320,8 +323,6 @@ std::shared_ptr<CWallet> CreateWallet(interfaces::Chain& chain, const std::strin
     status = DatabaseStatus::SUCCESS;
     return wallet;
 }
-
-const uint256 CWalletTx::ABANDON_HASH(UINT256_ONE());
 
 /** @defgroup mapWallet
  *
@@ -1174,7 +1175,7 @@ void CWallet::SyncTransaction(const CTransactionRef& ptx, CWalletTx::Confirmatio
     MarkInputsDirty(ptx);
 }
 
-void CWallet::transactionAddedToMempool(const CTransactionRef& tx) {
+void CWallet::transactionAddedToMempool(const CTransactionRef& tx, uint64_t mempool_sequence) {
     LOCK(cs_wallet);
     SyncTransaction(tx, {CWalletTx::Status::UNCONFIRMED, /* block height */ 0, /* block hash */ {}, /* index */ 0});
 
@@ -1184,7 +1185,7 @@ void CWallet::transactionAddedToMempool(const CTransactionRef& tx) {
     }
 }
 
-void CWallet::transactionRemovedFromMempool(const CTransactionRef& tx, MemPoolRemovalReason reason) {
+void CWallet::transactionRemovedFromMempool(const CTransactionRef& tx, MemPoolRemovalReason reason, uint64_t mempool_sequence) {
     LOCK(cs_wallet);
     auto it = mapWallet.find(tx->GetHash());
     if (it != mapWallet.end()) {
@@ -1231,7 +1232,7 @@ void CWallet::blockConnected(const CBlock& block, int height)
     m_last_block_processed = block_hash;
     for (size_t index = 0; index < block.vtx.size(); index++) {
         SyncTransaction(block.vtx[index], {CWalletTx::Status::CONFIRMED, height, block_hash, (int)index});
-        transactionRemovedFromMempool(block.vtx[index], MemPoolRemovalReason::BLOCK);
+        transactionRemovedFromMempool(block.vtx[index], MemPoolRemovalReason::BLOCK, 0 /* mempool_sequence */);
     }
 }
 
