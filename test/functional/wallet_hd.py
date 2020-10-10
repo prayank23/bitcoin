@@ -83,7 +83,7 @@ class WalletHDTest(BitcoinTestFramework):
         shutil.rmtree(os.path.join(self.nodes[1].datadir, self.chain, "chainstate"))
         shutil.copyfile(
             os.path.join(self.nodes[1].datadir, "hd.bak"),
-            os.path.join(self.nodes[1].datadir, self.chain, 'wallets', "wallet.dat"),
+            os.path.join(self.nodes[1].datadir, self.chain, 'wallets', self.default_wallet_name, self.wallet_data_filename),
         )
         self.start_node(1)
 
@@ -111,7 +111,7 @@ class WalletHDTest(BitcoinTestFramework):
         shutil.rmtree(os.path.join(self.nodes[1].datadir, self.chain, "chainstate"))
         shutil.copyfile(
             os.path.join(self.nodes[1].datadir, "hd.bak"),
-            os.path.join(self.nodes[1].datadir, self.chain, "wallets", "wallet.dat"),
+            os.path.join(self.nodes[1].datadir, self.chain, "wallets", self.default_wallet_name, self.wallet_data_filename),
         )
         self.start_node(1, extra_args=self.extra_args[1])
         self.connect_nodes(0, 1)

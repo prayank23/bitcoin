@@ -153,10 +153,19 @@ enum class ConnectionType {
     MANUAL,
 
     /**
-     * Feeler connections are short lived connections used to increase the
-     * number of connectable addresses in our AddrMan. Approximately every
-     * FEELER_INTERVAL, we attempt to connect to a random address from the new
-     * table. If successful, we add it to the tried table.
+     * Feeler connections are short-lived connections made to check that a node
+     * is alive. They can be useful for:
+     * - test-before-evict: if one of the peers is considered for eviction from
+     *   our AddrMan because another peer is mapped to the same slot in the tried table,
+     *   evict only if this longer-known peer is offline.
+     * - move node addresses from New to Tried table, so that we have more
+     *   connectable addresses in our AddrMan.
+     * Note that in the literature ("Eclipse Attacks on Bitcoin’s Peer-to-Peer Network")
+     * only the latter feature is referred to as "feeler connections",
+     * although in our codebase feeler connections encompass test-before-evict as well.
+     * We make these connections approximately every FEELER_INTERVAL:
+     * first we resolve previously found collisions if they exist (test-before-evict),
+     * otherwise connect to a node from the new table.
      */
     FEELER,
 
@@ -211,6 +220,7 @@ public:
         std::vector<NetWhitelistPermissions> vWhitelistedRange;
         std::vector<NetWhitebindPermissions> vWhiteBinds;
         std::vector<CService> vBinds;
+        std::vector<CService> onion_binds;
         bool m_use_addrman_outgoing = true;
         std::vector<std::string> m_specified_outgoing;
         std::vector<std::string> m_added_nodes;
@@ -408,7 +418,11 @@ private:
 
     bool BindListenPort(const CService& bindAddr, bilingual_str& strError, NetPermissionFlags permissions);
     bool Bind(const CService& addr, unsigned int flags, NetPermissionFlags permissions);
-    bool InitBinds(const std::vector<CService>& binds, const std::vector<NetWhitebindPermissions>& whiteBinds);
+    bool InitBinds(
+        const std::vector<CService>& binds,
+        const std::vector<NetWhitebindPermissions>& whiteBinds,
+        const std::vector<CService>& onion_binds);
+
     void ThreadOpenAddedConnections();
     void AddAddrFetch(const std::string& strDest);
     void ProcessAddrFetch();
@@ -580,21 +594,6 @@ void StartMapPort();
 void InterruptMapPort();
 void StopMapPort();
 uint16_t GetListenPort();
-
-struct CombinerAll
-{
-    typedef bool result_type;
-
-    template<typename I>
-    bool operator()(I first, I last) const
-    {
-        while (first != last) {
-            if (!(*first)) return false;
-            ++first;
-        }
-        return true;
-    }
-};
 
 /**
  * Interface for message handling

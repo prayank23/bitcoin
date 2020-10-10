@@ -63,10 +63,6 @@ from test_framework.util import (
     assert_greater_than,
     assert_raises_rpc_error,
 )
-from test_framework.segwit_addr import (
-    encode,
-    decode,
-)
 
 class AddressTypeTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -100,13 +96,6 @@ class AddressTypeTest(BitcoinTestFramework):
         """Return a list of balances."""
         return [self.nodes[i].getbalances()['mine'][key] for i in range(4)]
 
-    # Quick test of python bech32 implementation
-    def test_python_bech32(self, addr):
-        hrp = addr[:4]
-        assert_equal(hrp, "bcrt")
-        (witver, witprog) = decode(hrp, addr)
-        assert_equal(encode(hrp, witver, witprog), addr)
-
     def test_address(self, node, address, multisig, typ):
         """Run sanity checks on an address."""
         info = self.nodes[node].getaddressinfo(address)
@@ -131,7 +120,6 @@ class AddressTypeTest(BitcoinTestFramework):
             assert_equal(info['witness_version'], 0)
             assert_equal(len(info['witness_program']), 40)
             assert 'pubkey' in info
-            self.test_python_bech32(info["address"])
         elif typ == 'legacy':
             # P2SH-multisig
             assert info['isscript']
@@ -157,7 +145,6 @@ class AddressTypeTest(BitcoinTestFramework):
             assert_equal(info['witness_version'], 0)
             assert_equal(len(info['witness_program']), 64)
             assert 'pubkeys' in info
-            self.test_python_bech32(info["address"])
         else:
             # Unknown type
             assert False
