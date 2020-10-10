@@ -167,7 +167,6 @@ void ScriptPubKeyToUniv(const CScript& scriptPubKey,
         return;
     }
 
-    out.pushKV("reqSigs", nRequired);
     out.pushKV("type", GetTxnOutputType(type));
 
     UniValue a(UniValue::VARR);
