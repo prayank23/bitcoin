@@ -1332,8 +1332,6 @@ bool CWallet::IsChange(const CScript& script) const
         CTxDestination address;
         if (!ExtractDestination(script, address))
             return true;
-        if (!FindAddressBookEntry(address)) {
-            return true;
         }
     }
     return false;
