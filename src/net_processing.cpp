@@ -1673,6 +1673,52 @@ void RelayTransaction(const uint256& txid, const uint256& wtxid, const CConnman&
     });
 }
 
+static void RelayDandelionTransaction(const CTransaction& tx, CConnman* connman, CNode* pfrom)
+{
+    FastRandomContext rng;
+    if (rng.randrange(100)<DANDELION_FLUFF) {
+        LogPrint(BCLog::DANDELION, "Dandelion fluff: %s\n", tx.GetHash().ToString());
+        CValidationState state;
+        CTransactionRef ptx = stempool.get(tx.GetHash());
+        bool fMissingInputs = false;
+        std::list<CTransactionRef> lRemovedTxn;
+        AcceptToMemoryPool(mempool, state, ptx, &fMissingInputs, &lRemovedTxn, false /* bypass_limits */, 0 /* nAbsurdFee */);
+        LogPrint(BCLog::MEMPOOL, "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n",
+                 pfrom->GetId(), tx.GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+        RelayTransaction(tx, connman);
+    } else {
+        CInv inv(MSG_DANDELION_TX, tx.GetHash());
+        CNode* destination = connman->getDandelionDestination(pfrom);
+        if (destination!=nullptr) {
+            destination->PushInventory(inv);
+        }
+    }
+}
+
+static void CheckDandelionEmbargoes(CConnman* connman)
+{
+    int64_t nCurrTime = GetTimeMicros();
+    for (auto iter=connman->mDandelionEmbargo.begin(); iter!=connman->mDandelionEmbargo.end();) {
+        if (mempool.exists(iter->first)) {
+            LogPrint(BCLog::DANDELION, "Embargoed dandeliontx %s found in mempool; removing from embargo map\n", iter->first.ToString());
+            iter = connman->mDandelionEmbargo.erase(iter);
+        } else if (iter->second < nCurrTime) {
+            LogPrint(BCLog::DANDELION, "dandeliontx %s embargo expired\n", iter->first.ToString());
+            CValidationState state;
+            CTransactionRef ptx = stempool.get(iter->first);
+            bool fMissingInputs = false;
+            std::list<CTransactionRef> lRemovedTxn;
+            AcceptToMemoryPool(mempool, state, ptx, &fMissingInputs, &lRemovedTxn, false /* bypass_limits */, 0 /* nAbsurdFee */);
+            LogPrint(BCLog::MEMPOOL, "AcceptToMemoryPool: accepted %s (poolsz %u txn, %u kB)\n",
+                     iter->first.ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+            RelayTransaction(*ptx, connman);
+            iter = connman->mDandelionEmbargo.erase(iter);
+        } else {
+            iter++;
+        }
+    }
+}
+
 /**
  * Relay (gossip) an address to a few randomly chosen nodes.
  * We choose the same nodes within a given 24h window (if the list of connected
@@ -2909,6 +2955,12 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             LogPrint(BCLog::NET, "addrfetch connection completed peer=%d; disconnecting\n", pfrom.GetId());
             pfrom.fDisconnect = true;
         }
+        return;
+    }
+
+    if (msg_type == MSG_DANDELION_TX || MSG_DANDELION_WITNESS_TX) {
+        // Do not use AlreadyHave for Dandelion transactions
+        // If accidentally used, returns false so tx is requested
         return;
     }
 

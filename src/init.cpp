@@ -187,6 +187,9 @@ void Shutdown(NodeContext& node)
     util::ThreadRename("shutoff");
     if (node.mempool) node.mempool->AddTransactionsUpdated(1);
 
+    // Changes to mempool should also be made to Dandelion stempool
+    if (node.stempool) node.stempool->AddTransactionsUpdated(1);
+
     StopHTTPRPC();
     StopREST();
     StopRPC();
@@ -1407,6 +1410,8 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     assert(!node.mempool);
     int check_ratio = std::min<int>(std::max<int>(args.GetArg("-checkmempool", chainparams.DefaultConsistencyChecks() ? 1 : 0), 0), 1000000);
     node.mempool = std::make_unique<CTxMemPool>(node.fee_estimator.get(), check_ratio);
+    // Changes to mempool should also be made to Dandelion stempool
+    node.stempool.setSanityCheck(1.0 / ratio);
 
     assert(!node.chainman);
     node.chainman = &g_chainman;
