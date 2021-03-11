@@ -99,6 +99,7 @@ MESSAGEMAP = {
     b"cfheaders": msg_cfheaders,
     b"cfilter": msg_cfilter,
     b"cmpctblock": msg_cmpctblock,
+    b"dandeliontx": msg_dandeliontx,
     b"feefilter": msg_feefilter,
     b"filteradd": msg_filteradd,
     b"filterclear": msg_filterclear,
@@ -111,6 +112,7 @@ MESSAGEMAP = {
     b"headers": msg_headers,
     b"inv": msg_inv,
     b"mempool": msg_mempool,
+    b"notfound": msg_notfound,
     b"merkleblock": msg_merkleblock,
     b"notfound": msg_notfound,
     b"ping": msg_ping,
@@ -396,6 +398,7 @@ class P2PInterface(P2PConnection):
     def on_cfheaders(self, message): pass
     def on_cfilter(self, message): pass
     def on_cmpctblock(self, message): pass
+    def on_dandeliontx(self, message): pass
     def on_feefilter(self, message): pass
     def on_filteradd(self, message): pass
     def on_filterclear(self, message): pass
@@ -407,6 +410,7 @@ class P2PInterface(P2PConnection):
     def on_getheaders(self, message): pass
     def on_headers(self, message): pass
     def on_mempool(self, message): pass
+    def on_notfound(self, message): pass
     def on_merkleblock(self, message): pass
     def on_notfound(self, message): pass
     def on_pong(self, message): pass

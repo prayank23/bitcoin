@@ -1890,7 +1890,38 @@ bool CWalletTx::SubmitMemoryPoolAndRelay(std::string& err_string, bool relay)
     // Irrespective of the failure reason, un-marking fInMempool
     // out-of-order is incorrect - it should be unmarked when
     // TransactionRemovedFromMempool fires.
-    bool ret = pwallet->chain().broadcastTransaction(tx, pwallet->m_default_max_tx_fee, relay, err_string);
+
+    //Dandelion
+
+    if (gArgs.GetBoolArg("-dandelion", false)) {
+        int64_t nCurrTime = GetTimeMicros();
+        int64_t nEmbargo = 1000000*DANDELION_EMBARGO_MINIMUM+PoissonNextSend(nCurrTime, DANDELION_EMBARGO_AVG_ADD);
+        connman->insertDandelionEmbargo(GetHash(),nEmbargo);
+        LogPrint(BCLog::DANDELION, "dandeliontx %s embargoed for %d seconds\n", GetHash().ToString(), (nEmbargo-nCurrTime)/1000000);
+        CInv inv(MSG_DANDELION_TX, GetHash());
+        return connman->localDandelionDestinationPushInventory(inv);
+    } else {
+        CInv inv(MSG_TX, GetHash());
+        connman->ForEachNode([&inv](CNode* pnode)
+        {
+            pnode->PushInventory(inv);
+        });
+        return true;
+    }
+
+    bool ret;
+    if (gArgs.GetBoolArg("-dandelion", false)) {
+        ret = ::AcceptToMemoryPool(stempool, state, tx, nullptr /* pfMissingInputs */,
+                                    nullptr /* plTxnReplaced */, false /* bypass_limits */, nAbsurdFee);
+    } else {
+        ret = ::AcceptToMemoryPool(mempool, state, tx, nullptr /* pfMissingInputs */,
+                                    nullptr /* plTxnReplaced */, false /* bypass_limits */, nAbsurdFee);
+        // Changes to mempool should also be made to Dandelion stempool
+        CValidationState dummyState;
+        ret = ::AcceptToMemoryPool(stempool, dummyState, tx, nullptr /* pfMissingInputs */,
+                                    nullptr /* plTxnReplaced */, false /* bypass_limits */, nAbsurdFee);
+    }
+
     fInMempool |= ret;
     return ret;
 }

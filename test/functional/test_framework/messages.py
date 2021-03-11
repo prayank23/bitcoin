@@ -292,6 +292,8 @@ class CInv:
         MSG_BLOCK | MSG_WITNESS_FLAG: "WitnessBlock",
         MSG_FILTERED_BLOCK: "filtered Block",
         MSG_CMPCT_BLOCK: "CompactBlock",
+        MSG_DANDELION_TX: "DandelionTx",
+        MSG_WITNESS_FLAG: "DandelionWitnessTx"
         MSG_WTX: "WTX",
     }
 
@@ -1586,6 +1588,21 @@ class msg_cmpctblock:
 
     def __repr__(self):
         return "msg_cmpctblock(HeaderAndShortIDs=%s)" % repr(self.header_and_shortids)
+
+class msg_dandeliontx():
+    command = b"dandeliontx"
+
+    def __init__(self, tx=CTransaction()):
+        self.tx = tx
+
+    def deserialize(self, f):
+        self.tx.deserialize(f)
+
+    def serialize(self):
+        return self.tx.serialize_without_witness()
+
+    def __repr__(self):
+        return "msg_dandeliontx(tx=%s)" % (repr(self.tx))
 
 
 class msg_getblocktxn:
